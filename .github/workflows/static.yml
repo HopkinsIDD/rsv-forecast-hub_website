@@ -41,3 +41,25 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v3
+      - name: Notify owner
+        uses: actions/github-script@v5
+        with:
+          github-token: ${{ secrets.KJ3_PATC }}
+          script: |
+            const owner = "${{ github.repository_owner }}"
+            const page_url = "${{ steps.deployment.outputs.page_url }}"
+            const actor = "${{ env.actor }}" || 'unknown'
+            const pr_number = "${{ env.pr_number }}" || 'unknown'
+            const changed_files = "${{ env.CHANGED_FILES }}" || 'unknown'
+            const changed_files_links = changed_files.split(',').map(file => `${page_url}${file}`).join(', ')
+            const message = actor === 'unknown' && pr_number === 'unknown'
+              ? `Hello @${owner}, the deployment has been completed. You can view the updated pages at ${page_url}. The following files were changed: ${changed_files_links}`
+              : `Hello @${owner}, the deployment of changes by @${actor} in PR #${pr_number} has been completed. You can view the updated pages at ${page_url}. The following files were changed: ${changed_files_links}`
+            github.rest.issues.create({
+              owner: owner,
+              repo: context.repo.repo,
+              title: pr_number === 'unknown'
+                ? `Deployment completed`
+                : `Deployment completed for PR #${pr_number}`,
+              body: message
+            })
